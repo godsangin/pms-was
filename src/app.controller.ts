@@ -1,12 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ProjectsService } from './projects/projects.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly projectsService: ProjectsService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Get('dashboard')
+  getDashboard(@Query('lang') lang: string = 'ko') {
+    return this.projectsService.getDashboard(lang);
   }
 }

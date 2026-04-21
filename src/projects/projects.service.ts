@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Project } from './entities/project.entity';
 import { SoftwareProject } from './entities/software-project.entity';
 import { Task } from './entities/task.entity';
+import { Risk } from './entities/risk.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 
 @Injectable()
@@ -15,74 +16,111 @@ export class ProjectsService {
     private softwareRepository: Repository<SoftwareProject>,
     @InjectRepository(Task)
     private tasksRepository: Repository<Task>,
+    @InjectRepository(Risk)
+    private risksRepository: Repository<Risk>,
   ) {}
 
-  async create(createProjectDto: CreateProjectDto) {
-    const project = this.projectsRepository.create(createProjectDto);
-    const savedProject = await this.projectsRepository.save(project);
-    
-    if (createProjectDto.softwareProject) {
-      const software = this.softwareRepository.create({
-        ...createProjectDto.softwareProject,
-        projectId: savedProject.id,
-      });
-      await this.softwareRepository.save(software);
+  private localize(data: any, lang: string) {
+    if (!data) return data;
+    if (typeof data === 'object' && data[lang]) {
+      return data[lang];
     }
-    
-    return this.findOne(savedProject.id);
+    return data;
   }
 
-  findAll() {
-    return this.projectsRepository.find({
-      relations: ['softwareProject', 'stages', 'tasks'],
+  private mapProject(project: Project, lang: string) {
+    return {
+      ...project,
+      name: this.localize(project.name, lang),
+      description: this.localize(project.description, lang),
+      // Computed fields for frontend if needed
+    };
+  }
+
+  async findAll(lang: string = 'ko') {
+    const projects = await this.projectsRepository.find({
+      relations: ['softwareProject'],
     });
+    return projects.map(p => this.mapProject(p, lang));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, lang: string = 'ko') {
     const project = await this.projectsRepository.findOne({
       where: { id },
-      relations: ['softwareProject', 'stages', 'tasks'],
+      relations: ['softwareProject', 'tasks', 'stages'],
     });
     if (!project) throw new NotFoundException('Project not found');
-    return project;
+    
+    const risks = await this.risksRepository.find({ where: { projectId: id } });
+    
+    return {
+      project: this.mapProject(project, lang),
+      risks: risks.map(r => ({
+        ...r,
+        title: this.localize(r.title, lang),
+        cause: this.localize(r.cause, lang),
+        action: this.localize(r.action, lang),
+        expectedImpact: this.localize(r.expectedImpact, lang),
+      })),
+    };
   }
 
-  async getTasks(projectId: string) {
+  async getTasks(projectId: string, lang: string = 'ko') {
     const tasks = await this.tasksRepository.find({
       where: { projectId },
       order: { wbsCode: 'ASC' },
     });
-    return tasks;
+    return tasks.map(t => ({
+      ...t,
+      name: this.localize(t.name, lang),
+    }));
   }
 
-  /**
-   * WBS 정책에 따라 프로젝트 전체 진척도를 산출합니다.
-   * 정책: (각 태스크 진척도 * 가중치)의 합계
-   */
-  async calculateProjectProgress(projectId: string): Promise<number> {
-    const tasks = await this.getTasks(projectId);
-    if (tasks.length === 0) return 0;
+  async getRisks(projectId: string, lang: string = 'ko') {
+    const risks = await this.risksRepository.find({ where: { projectId } });
+    return risks.map(r => ({
+      ...r,
+      title: this.localize(r.title, lang),
+      cause: this.localize(r.cause, lang),
+      action: this.localize(r.action, lang),
+      expectedImpact: this.localize(r.expectedImpact, lang),
+    }));
+  }
 
-    // Depth 0 또는 Depth 1 등 최상위 레벨에서의 합산 로직
-    // 여기서는 leaf node(더 이상 자식이 없는 노드)의 구성을 전체 프로젝트에 합산하는 로직을 적용합니다.
+  async calculateProjectProgress(projectId: string): Promise<number> {
+    const tasks = await this.tasksRepository.find({ where: { projectId } });
+    if (tasks.length === 0) return 0;
     return tasks.reduce((acc, task) => {
-      // CSV의 '구성진행비율' 정책에 따라 이미 가중치가 적용된 값을 합산하거나,
-      // 여기서 실시간으로 가중치 연산을 수행합니다.
       return acc + (Number(task.progressPct) * Number(task.weight)) / 100;
     }, 0);
   }
 
-  async update(id: string, updateData: Partial<CreateProjectDto>) {
-    await this.projectsRepository.update(id, {
-      name: updateData.name,
-      startDate: updateData.startDate,
-      endDate: updateData.endDate,
+  async getDashboard(lang: string = 'ko') {
+    const projects = await this.findAll(lang);
+    const topRisks = await this.risksRepository.find({
+      order: { targetDate: 'ASC' },
+      take: 5,
     });
-    
-    if (updateData.softwareProject) {
-      await this.softwareRepository.update(id, updateData.softwareProject);
-    }
-    
-    return this.findOne(id);
+
+    return {
+      asOfDate: new Date().toISOString(),
+      kpis: {
+        totalProjects: projects.length,
+        inProgressProjects: projects.length, // Simplified
+        onTrackPercent: 100, // Computed or static for now
+        atRiskProjects: 0,
+        criticalTasks: 0,
+        deliverableApprovalRate: 100,
+        portfolioSvAvg: 0,
+      },
+      projects,
+      topRisks: topRisks.map(r => ({
+        ...r,
+        title: this.localize(r.title, lang),
+        cause: this.localize(r.cause, lang),
+        action: this.localize(r.action, lang),
+        expectedImpact: this.localize(r.expectedImpact, lang),
+      })),
+    };
   }
 }

@@ -1,48 +1,59 @@
-import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Deliverable } from '../deliverables/entities/deliverable.entity';
 
 @ApiTags('projects')
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    @InjectRepository(Deliverable)
+    private readonly deliverableRepository: Repository<Deliverable>,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: '신규 프로젝트 등록' })
   create(@Body() createProjectDto: CreateProjectDto) {
+    // Note: DTO should be updated to handle JSONB name/description
     return this.projectsService.create(createProjectDto);
   }
 
   @Get()
   @ApiOperation({ summary: '전체 프로젝트 조회' })
-  findAll() {
-    return this.projectsService.findAll();
+  findAll(@Query('lang') lang: string = 'ko') {
+    return this.projectsService.findAll(lang);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '상세 프로젝트 조회' })
-  findOne(@Param('id') id: string) {
-    return this.projectsService.findOne(id);
+  findOne(@Param('id') id: string, @Query('lang') lang: string = 'ko') {
+    return this.projectsService.findOne(id, lang);
   }
 
   @Get(':id/tasks')
   @ApiOperation({ summary: '프로젝트 태스크(WBS) 조회' })
-  getTasks(@Param('id') id: string) {
-    return this.projectsService.getTasks(id);
+  getTasks(@Param('id') id: string, @Query('lang') lang: string = 'ko') {
+    return this.projectsService.getTasks(id, lang);
   }
 
   @Get(':id/progress')
-  @ApiOperation({ summary: '프로젝트 진척도(WBS 기반 합산) 조회' })
+  @ApiOperation({ summary: '프로젝트 진척도 조회' })
   async getProgress(@Param('id') id: string) {
     const progress = await this.projectsService.calculateProjectProgress(id);
-    // 차트용 더미 히스토리를 포함하여 반환하거나 실시간 계산값을 반환
     return [{ week: '현재', planned: 14, actual: progress }];
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: '프로젝트 정보 수정' })
-  update(@Param('id') id: string, @Body() updateData: Partial<CreateProjectDto>) {
-    return this.projectsService.update(id, updateData);
+  @Get(':id/deliverables')
+  @ApiOperation({ summary: '프로젝트 산출물 조회' })
+  async getDeliverables(@Param('id') id: string, @Query('lang') lang: string = 'ko') {
+    const items = await this.deliverableRepository.find({ where: { projectId: id } });
+    return items.map(item => ({
+      ...item,
+      title: typeof item.title === 'object' ? item.title[lang] : item.title,
+    }));
   }
 }

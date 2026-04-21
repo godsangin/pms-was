@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Project } from '../../projects/entities/project.entity';
 import { Stage } from '../../stages/entities/stage.entity';
 
 @Entity('deliverables')
@@ -7,17 +8,37 @@ export class Deliverable {
   id: string;
 
   @Column()
-  name: string;
+  projectId: string;
 
-  @Column()
-  type: string; // DOC, CODE, etc.
+  @ManyToOne(() => Project)
+  @JoinColumn({ name: 'projectId' })
+  project: Project;
+
+  @Column({ nullable: true })
+  stageId: string;
+
+  @ManyToOne(() => Stage)
+  @JoinColumn({ name: 'stageId' })
+  stage: Stage;
+
+  @Column({ type: 'jsonb' })
+  title: any;
+
+  @Column({ default: 'PLANNED' })
+  status: string;
+
+  @Column({ type: 'date', nullable: true })
+  dueDate: Date;
+
+  @Column({ type: 'date', nullable: true })
+  submittedDate: Date;
+
+  @Column({ type: 'date', nullable: true })
+  decidedDate: Date;
 
   @Column({ nullable: true })
   fileUrl: string;
 
-  @Column({ default: 'PENDING' })
-  status: string;
-
-  @ManyToOne(() => Stage, (stage) => stage.deliverables)
-  stage: Stage;
+  @Column({ nullable: true })
+  fileName: string;
 }

@@ -1,29 +1,41 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsArray, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsDateString, IsObject } from 'class-validator';
 
 export class CreateSoftwareProjectDto {
   @ApiProperty({ example: ['React', 'NestJS'] })
   @IsArray()
-  techStack: string[];
+  @IsOptional()
+  techStack?: string[];
 
   @ApiProperty({ example: 'https://github.com/repo' })
   @IsString()
-  gitRepoUrl: string;
+  @IsOptional()
+  gitRepoUrl?: string;
 
   @ApiProperty({ example: 'Microservices' })
   @IsString()
-  architectureType: string;
+  @IsOptional()
+  architectureType?: string;
 }
 
 export class CreateProjectDto {
-  @ApiProperty({ example: '신규 시스템 구축' })
+  @ApiProperty({ example: 'P-2026' })
   @IsString()
-  name: string;
+  id: string;
 
-  @ApiProperty({ example: '프로젝트 설명' })
+  @ApiProperty({ example: { ko: '프로젝트명', en: 'Project Name' } })
+  @IsObject()
+  name: any;
+
+  @ApiProperty({ example: { ko: '설명', en: 'Description' } })
+  @IsOptional()
+  @IsObject()
+  description?: any;
+
+  @ApiProperty({ example: 'Hong Gil Dong' })
   @IsOptional()
   @IsString()
-  description?: string;
+  pmName?: string;
 
   @ApiProperty({ example: '2024-04-20' })
   @IsDateString()
@@ -33,6 +45,7 @@ export class CreateProjectDto {
   @IsDateString()
   endDate: string;
 
-  @ApiProperty({ type: CreateSoftwareProjectDto })
-  softwareProject: CreateSoftwareProjectDto;
+  @ApiProperty({ type: CreateSoftwareProjectDto, required: false })
+  @IsOptional()
+  softwareProject?: CreateSoftwareProjectDto;
 }

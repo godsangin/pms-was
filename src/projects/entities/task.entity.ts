@@ -9,7 +9,7 @@ export class Task {
   @Column()
   projectId: string;
 
-  @ManyToOne(() => Project)
+  @ManyToOne(() => Project, (project) => project.tasks)
   @JoinColumn({ name: 'projectId' })
   project: Project;
 
@@ -19,8 +19,8 @@ export class Task {
   @Column()
   depth: number;
 
-  @Column()
-  name: string;
+  @Column({ type: 'jsonb' })
+  name: any;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
   weight: number;
@@ -28,10 +28,10 @@ export class Task {
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
   progressPct: number;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', nullable: true })
   baselineStart: Date;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', nullable: true })
   baselineEnd: Date;
 
   @Column({ type: 'date', nullable: true })
